@@ -73,6 +73,12 @@ int main() {
         else { ecs.destroy(entity); }
     }
 
+    std::cout << "filtered component view" << std::endl;
+
+    for(auto entity: ecs.view<Position>().exclude<Velocity>()) {
+        std::cout << (registry.has<Position>(entity)) << "/" << (registry.has<Velocity>(entity)) << std::endl;
+    }
+
     ecs.reset();
 }
 ```
@@ -189,12 +195,13 @@ Note that entities are numbers and nothing more. They are not classes and they h
 
 #### The View
 
-There are two different kinds of view, each one with a slighlty different interface:
+There are three different kinds of view, each one with a slighlty different interface:
 
 * The _single component view_.
 * The _multi component view_.
+* The _filtered view_.
 
-Both of them are iterable, that is both of them have `begin` and `end` member functions that are suitable for a range-based for loop:
+All of them are iterable. In other terms they have `begin` and `end` member functions that are suitable for a range-based for loop:
 
 ```
 auto view = registry.view<Position, Velocity>();
@@ -221,16 +228,40 @@ The multi component view has an additional member function:
 
 * `reset()`: reorganizes internal data so as to further create optimized iterators (use it whenever the data within the registry are known to be changed).
 
-Both the views can be used more than once. They return newly created and correctly initialized iterators whenever
+A filtered view is nothing more than a multi component view with an additional set of components that act as filters.<br/>
+Users can create filtered views either from a single component view or from a multi component view by means of the `exclude` member function:
+
+```
+auto view = registry.view<Position>().exclude<Velocity>();
+
+for(auto entity: view) {
+    // do whatever you want with your entities
+}
+```
+
+All the views can be used more than once. They return newly created and correctly initialized iterators whenever
 `begin` or `end` is invoked. Anyway views and iterators are tiny objects and the time to construct them can be safely ignored.
 I'd suggest not to store them anywhere and to invoke the `Registry::view` member function at each iteration to get a properly
 initialized view over which to iterate.
 
 **Note**: An important feature (usually missed by other well known ECS) is that users can create and destroy entities, as
-well as assign or remove components while iterating and neither the views nor the iterators will be invalidated.<br/>
-Therefore, unless one tries to access a destroyed entity through an iterator that hasn't been advanced (in this case, of course,
-it's an undefined behaviour), users can freely interact with the registry and keep views and iterators consistent.<br/>
-On the other side, iterators aren't thread safe. Do no try to iterate over a set of components and modify them concurrently.
+well as assign or remove components while iterating and neither the views nor the iterators will be invalidated.
+
+There are a few exceptions to the rule:
+
+* Trying to access a destroyed entity through an iterator that hasn't been advanced results in an undefined behavior.
+* Destroying an entity that isn't the one returned by the iterator in use results in an undefined behavior.
+* Removing a component from an entity that isn't the one returned by the iterator in use results in an undefined behavior.
+
+In other therms, users can freely interact with the registry and keep views and iterators consistent as long as:
+
+* They create new entities with their set of components or assign components of any type to an already existent entity.
+* They destroy the current entity (that is the one returned by the iterator in use) or remove its components.
+
+In any other case the behavior is undefined and additions and deletions should be managed externally in a batch or whatever.
+As an example, whenever there exists a parent-child relationship, one can incurr in the problem above mentioned.
+
+Note also that iterators aren't thread safe. Do no try to iterate over a set of components and modify them concurrently.
 That being said, as long as a thread iterates over the entities that have the component `X` or assign and removes
 that component from a set of entities and another thread does something similar with components `Y` and `Z`, it shouldn't be a
 problem at all.<br/>
