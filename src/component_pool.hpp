@@ -93,6 +93,23 @@ public:
         return data.back();
     }
 
+    // Associates a preconstruted component with the given entity (using the component's move constructor)
+    component_type & construct(entity_type entity, component_type&& component)
+    {
+        assert(!valid(entity));
+
+        if (!(entity < reverse.size()))
+        {
+            reverse.resize(entity + 1);
+        }
+
+        reverse[entity] = pos_type(direct.size());
+        direct.emplace_back(entity);
+        data.emplace_back(component);
+
+        return data.back();
+    }
+
     // Removes the component associated with the given entity
     void destroy(entity_type entity) {
         assert(valid(entity));
@@ -195,6 +212,13 @@ public:
     template<typename Comp, typename... Args>
     Comp & construct(entity_type entity, Args... args) {
         return Pool<Comp>::construct(entity, args...);
+    }
+
+    // Associates a preconstruted component with the given entity (using the component's move constructor)
+    template<typename Comp>
+    Comp & construct(entity_type entity, Comp&& component)
+    {
+        return Pool<Comp>::construct(entity, component);
     }
 
     // Removes the component (of the templated component type) associated with the given entity
